@@ -1,9 +1,10 @@
 #!/usr/bin/python
 #animation_runner.py
 __author__ = "Elijah"
-__version = 2.7
+__version__ = 3.1
 
 import tkinter as tk
+import painter
 from tkinter import colorchooser
 
 height  = 500
@@ -11,90 +12,162 @@ width   = 900
 x_shift = 0
 y_shift = 20
 
-slider  = None
+slider   = None
 
 bg = "white"
 
 circle_creator = False
 line_creator   = False
+sizer          = False
 
-coords  = []
-circles = []
-erased  = []
-lines   = []
-moves   = []
+coords    = []
+circles   = []
+erased    = []
+lines     = []
+moves     = []
+undo_list = []
 
 root = tk.Tk()
 root.title("Animation")
+root.geometry("%dx%d+%d+%d" % (width, height, x_shift, y_shift))
 
-def colors():
+def set_color():
+    """Sets the current default color"""
+
     global color
     current_color = colorchooser.askcolor(title="Choose color")
     color = current_color[1]
+    pen_draw.color = color
 
-def slider_circle(event):
-    global size_slider, canvas, width, height, slider
+def create_circle_slider(event=1):
+    """Creates a size circle that represents the brush size
+
+    :param event: the current size of the brush
+    :return: None"""
+
+    global pen_size_slider, width, height, slider
     
-    amt = size_slider.get()
+    #gets the value of the pen size
+    amt = float(pen_size_slider.get())
     amt //= 2
     
     height_pos = height // 2
     width_pos  = width // 2
     
+    #makes a circle the same size as the pen
     canvas.delete(slider)
-    coords = [width_pos - amt, height_pos - amt, width_pos + amt, height_pos + amt]
-    slider = canvas.create_oval(coords, fill="white", outline="black")
+    current_coords = [width_pos - amt, height_pos - amt, width_pos + amt, height_pos + amt]
+    slider = canvas.create_oval(current_coords, fill="white", outline="black")
+    
+    pen_draw.slider = slider
 
-canvas = tk.Canvas(root, width=width, height=height, bg=bg)
-color_button = tk.Button(root, text="Color", command=colors)
-size_slider = tk.Scale(root, from_=1, to=30, orient="horizontal", command=slider_circle)
-color = ""
+canvas = tk.Canvas(root, width=width - 35, height=height - 60, bg=bg)
+canvas.grid(row=2, column=1, columnspan=10)
 
-def options():
-    undo_button       = tk.Button(root, text="Undo", command=undo)
-    line_button       = tk.Button(root, text="Line", command=line)
-    circle_button     = tk.Button(root, text="Circle", command=circle)
-    background_button = tk.Button(root, text="Background", command=background)
+color_btn = tk.Button(root, text="Color", command=set_color)
+pen_size_slider = tk.Scale(root, from_=1, to=30, orient="horizontal", command=create_circle_slider)
 
-    line_button.grid(row=0, column=0)
-    color_button.grid(row=0, column=1)
-    undo_button.grid(row=0, column=2)
-    circle_button.grid(row=0, column=3)
-    background_button.grid(row=0, column=4)
+color    = ""
+pen_draw = ""
 
-def circle():
+def create_buttons():
+    """Creates the buttons for the main screen"""
+    undo_btn       = tk.Button(root, text="Undo", command=undo)
+    line_btn       = tk.Button(root, text="Line", command=set_line_mode)
+    circle_btn     = tk.Button(root, text="Circle", command=set_circle_mode)
+    background_btn = tk.Button(root, text="Background", command=set_background)
+    size_btn       = tk.Button(root, text="Size", command=set_pen_size)
+
+    line_btn.grid(row=0, column=0)
+    color_btn.grid(row=0, column=1)
+    undo_btn.grid(row=0, column=2)
+    circle_btn.grid(row=0, column=3)
+    background_btn.grid(row=0, column=4)
+    size_btn.grid(row=0, column=5)
+
+def set_circle_mode():
+    """Turns on circle mode if the circle button is clicked"""
+
     global line_creator, coords, circle_creator
-
     canvas.config(cursor="circle")
-
+    
+    #checks if circle mode is already active
     if circle_creator:
         circle_creator = False
         coords = []
     else:
         circle_creator = True
         line_creator   = False
+    pen_draw.circle_creator = circle_creator
+    pen_draw.line_creator   = line_creator
+    pen_draw.draw_mode      = False
 
-def line():
+def set_line_mode():
+    """Turns on line mode if the line button is clicked"""
+
     global line_creator, coords, circle_creator
-
     canvas.config(cursor="dot")
-
+    
     if line_creator:
         line_creator = False
         coords = []
     else:
         line_creator   = True
         circle_creator = False
+    
+    pen_draw.circle_creator = circle_creator
+    pen_draw.line_creator   = line_creator
+    pen_draw.draw_mode      = False
+
+def set_pen_size():
+    """Creates the slider for the brush size
+    
+    :return: False if slider is already open"""
+    
+    global pen_size_slider, sizer, pen_draw, slider
+    
+    #removes the slider if its already on the canvas
+    if sizer:
+        sizer = False
+        pen_size_slider.grid_forget()
+        canvas.delete(slider)
+        slider = None
+        
+        return False
+    
+    else:
+        sizer = True
+        create_circle_slider()
+    
+    pen_draw.sizer  = sizer
+    pen_draw.slider = slider
+    
+    pen_size_slider.grid(row=1, column=5, rowspan=1, columnspan=1)
 
 def clicked(event):
+    """Starts a circle or line at where the click occured
+
+    :param event: the place that was clicked
+    :return: False is draw mode is on"""
+
     global line_creator, coords, lines, color, circle_creator, circles, moves, slider
     
+    #checks if pen mode is on
+    if pen_draw.draw_mode:
+        circle_creator = False
+        line_creator   = False
+        return False
+    
+    #removes the size slider if its on
     if (line_creator or circle_creator) and slider != None:
         canvas.delete(slider)
         slider = None
+    
     if line_creator and len(coords) == 0:
         coords.append(event.x)
         coords.append(event.y)
+    
+    #checks to see if there is a color chosen
     elif line_creator and len(coords) != 0:
         if color != "":
             line = canvas.create_line(coords, event.x, event.y, fill=color)
@@ -102,11 +175,16 @@ def clicked(event):
             line = canvas.create_line(coords, event.x, event.y)
         moves.append(line)
         coords = []
-        lines  = []
+        
+        for shape in lines:
+            canvas.delete(shape)
+        lines = []
 
     if circle_creator and len(coords) == 0:
         coords.append(event.x)
         coords.append(event.y)
+    
+    #checks to see if there is a color chosen
     elif circle_creator and len(coords) != 0:
         if color != "":
             circle = canvas.create_oval(coords, event.x, event.y, fill=color)
@@ -114,11 +192,20 @@ def clicked(event):
             circle = canvas.create_oval(coords, event.x, event.y)
         moves.append(circle)
         coords  = []
+        
+        for shape in circles:
+            canvas.delete(shape)
         circles = []
 
-def motion(event):
-    global line_creator, coords, lines, canvas, color, circle_creator, circles, size_slider
+def draw_shape(event):
+    """Draws either the circle or line depending on which mode is active
+
+    :param event: the place where the mouse is
+    :return: None"""
+
+    global line_creator, coords, lines, canvas, color, circle_creator, circles, pen_size_slider
     
+    #creates a line if line mode is active
     if line_creator:
         if len(coords) != 0:
             try:
@@ -133,6 +220,8 @@ def motion(event):
             else:
                 line = canvas.create_line(coords, event.x, event.y)
             lines.append(line)
+    
+    #creates a circle is circle mode is active
     elif circle_creator:
         if len(coords) != 0:
             try:
@@ -148,132 +237,58 @@ def motion(event):
                 circle = canvas.create_oval(coords, event.x, event.y)
             circles.append(circle)
             
-def background():
-    global bg, canvas, erased
-    color = colorchooser.askcolor(title="Choose Background")
-    bg = color[1]
-    canvas.config(bg=bg)
+def set_background():
+    """Sets the background color based on the user's choice"""
 
+    global bg, canvas, erased
+    
+    #gets the new background color
+    current_color = colorchooser.askcolor(title="Choose Background")
+    bg = current_color[1]
+    pen_draw.canvas.config(bg=bg)
+    
+    #changes every erase mark to the color of the background
     for mark in erased:
         new_line = canvas.itemconfig(mark, fill=bg)
+    
+    pen_draw.bg = bg
 
 def undo():
-    global moves
+    """Un-does the most recent move made by the user"""
+    global moves, undo_list
+    
+    #tries to remove the most recent move
     try:
-        canvas.delete(moves[-1])
-        moves.remove(moves[-1])
+        move = moves[-1]
+        canvas.delete(move)
+        moves.remove(move)
+        
+        undo_list.append(move)
+    except IndexError:
+        pass
+    
+    pen_draw.moves = moves
+
+def redo():
+    """Re-does the most recent move that was un-done by the user"""
+    global moves, undo_list
+    
+    try:
+        move = undo_list[-1]
+        #DNF
     except IndexError:
         pass
 
-class Draw(object):
-    global bg, color, erased
-    pen_size = 5.0
-    default_color = "black"
-
-    def __init__(self):
-        global root, canvas
-        self.root = root
-        self.pen_button = tk.Button(self.root, text="pen", command=self.pen)
-        self.eraser_button = tk.Button(self.root, text="eraser", command=self.erase)
-        self.save_button = tk.Button(self.root, text="save", command=self.save)
-        
-        self.size_slider = size_slider
-        self.canvas = canvas
-
-        self.pen_button.grid(row=0, column=5)
-        self.eraser_button.grid(row=0, column=6)
-        self.save_button.grid(row=0, column=7)
-        self.size_slider.grid(row=0, column=8)
-
-        self.setup()
-        self.root.mainloop()
-
-    def setup(self):
-        self.old_x = None
-        self.old_y = None
-        self.line_width = self.size_slider.get()
-        self.color = self.default_color
-        self.eraser_on = False
-        self.active_button = self.pen_button
-        self.canvas.bind("<B1-Motion>", self.paint)
-        self.canvas.bind("<ButtonRelease-1>", self.reset)
-
-    def pen(self):
-        self.activate_button(self.pen_button)
-        self.canvas.config(cursor="pencil")
-
-    def erase(self):
-        self.activate_button(self.eraser_button, eraser_mode=True)
-
-    def save(self):
-        entry = tk.entry(self.root, bd=5)
-        entry.grid()
-        self.canvas.postscript(file = file_name + '.eps')
-
-    def activate_button(self, button, eraser_mode=False):
-        global line_creator, circle_creator
-        line_creator = False
-        circle_creator = False
-        self.active_button.config(relief='raised')
-        button.config(relief='sunken')
-        self.active_button = button
-        self.eraser_on = eraser_mode
-
-    def paint(self, event):
-        global color, moves, circle_creator, line_creator, slider
-        
-        if slider != None:
-            canvas.delete(slider)
-            slider = None
-
-        if circle_creator or line_creator:
-            return False
-        if color != "":
-            self.color = color
-        else:
-            self.color = self.default_color
-        self.line_width = self.size_slider.get()
-        if self.eraser_on:
-            canvas.config(cursor="")
-            if bg != "":
-                paint_color = bg
-            else:
-                paint_color = "white"
-        else:
-            paint_color = self.color
-
-        if self.old_x and self.old_y:
-            line = self.canvas.create_line(self.old_x, self.old_y, event.x,
-                                           event.y, width=self.line_width,
-                                           fill=paint_color, capstyle='round',
-                                           smooth='true', splinesteps=36)
-            if self.eraser_on:
-                erased.append(line)
-            moves.append(line)
-        self.old_x = event.x
-        self.old_y = event.y
-
-    def reset(self, event):
-        self.old_x = None
-        self.old_y = None
-
 def main():
-    root.geometry("%dx%d+%d+%d" % (width, height, x_shift, y_shift))
-    options()
-
-    menubar = tk.Menu(root)
-    root.config(menu=menubar)
-
-    file_menu = tk.Menu(menubar)
-    file_menu.add_command(label="Undo", command=undo)
-
-    canvas.grid(row=1, columnspan=9)
-
+    """Starts the whole program and listens for mouse clicks"""
+    global pen_draw
+    
+    create_buttons()
+    pen_draw = painter.Draw_tools(bg, canvas, color, circle_creator, erased,
+                line_creator, moves, root, sizer, pen_size_slider, slider)
+    
     canvas.bind("<Button-1>", clicked)
-    canvas.bind("<Motion>", motion)
-
-    Draw()
-
+    canvas.bind("<Motion>", draw_shape)
     root.mainloop()
 
 if __name__ == '__main__':
