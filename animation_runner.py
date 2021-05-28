@@ -376,7 +376,7 @@ def main():
     
     canvas.bind("<Button-1>", clicked)
     canvas.bind("<Motion>", draw_shape)
-    root.bind("<Command-u>", lambda x: undo())
+    root.bind("<Control-u>", lambda x: undo())
     root.mainloop()
 
 if __name__ == '__main__':
