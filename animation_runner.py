@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #animation_runner.py
 __author__ = "Elijah"
-__version__ = 3.1
+__version__ = 3.3
 
 import tkinter as tk
 import painter
@@ -18,6 +18,7 @@ bg = "white"
 
 circle_creator = False
 line_creator   = False
+square_creator = False
 sizer          = False
 
 coords    = []
@@ -25,6 +26,7 @@ circles   = []
 erased    = []
 lines     = []
 moves     = []
+squares   = []
 undo_list = []
 
 root = tk.Tk()
@@ -77,46 +79,75 @@ def create_buttons():
     circle_btn     = tk.Button(root, text="Circle", command=set_circle_mode)
     background_btn = tk.Button(root, text="Background", command=set_background)
     size_btn       = tk.Button(root, text="Size", command=set_pen_size)
+    square_btn     = tk.Button(root, text="Square", command=set_square_mode)
 
     line_btn.grid(row=0, column=0)
-    color_btn.grid(row=0, column=1)
-    undo_btn.grid(row=0, column=2)
-    circle_btn.grid(row=0, column=3)
+    circle_btn.grid(row=0, column=1)
+    square_btn.grid(row=0, column=2)
+    color_btn.grid(row=0, column=3)
     background_btn.grid(row=0, column=4)
     size_btn.grid(row=0, column=5)
+    undo_btn.grid(row=0, column=6)
 
 def set_circle_mode():
     """Turns on circle mode if the circle button is clicked"""
 
-    global line_creator, coords, circle_creator
+    global line_creator, coords, circle_creator, square_creator
     canvas.config(cursor="circle")
     
     #checks if circle mode is already active
     if circle_creator:
         circle_creator = False
         coords = []
+        canvas.config(cursor="")
     else:
         circle_creator = True
         line_creator   = False
+        square_creator = False
+        
     pen_draw.circle_creator = circle_creator
     pen_draw.line_creator   = line_creator
+    pen_draw.square_creator = square_creator
     pen_draw.draw_mode      = False
 
 def set_line_mode():
     """Turns on line mode if the line button is clicked"""
 
-    global line_creator, coords, circle_creator
-    canvas.config(cursor="dot")
+    global line_creator, coords, circle_creator, square_creator
+    canvas.config(cursor="cross")
     
     if line_creator:
         line_creator = False
         coords = []
+        canvas.config(cursor="")
     else:
         line_creator   = True
+        circle_creator = False
+        square_creator = False
+        
+    pen_draw.circle_creator = circle_creator
+    pen_draw.line_creator   = line_creator
+    pen_draw.square_creator = square_creator
+    pen_draw.draw_mode      = False
+    
+def set_square_mode():
+    """Turns on square mode if the square button is clicked"""
+    
+    global line_creator, coords, circle_creator, square_creator
+    canvas.config(cursor="dotbox")
+    
+    if square_creator:
+        square_creator = False
+        coords = []
+        canvas.config(cursor="")
+    else:
+        square_creator = True
+        line_creator   = False
         circle_creator = False
     
     pen_draw.circle_creator = circle_creator
     pen_draw.line_creator   = line_creator
+    pen_draw.square_creator = square_creator
     pen_draw.draw_mode      = False
 
 def set_pen_size():
@@ -150,16 +181,18 @@ def clicked(event):
     :param event: the place that was clicked
     :return: False is draw mode is on"""
 
-    global line_creator, coords, lines, color, circle_creator, circles, moves, slider
+    global line_creator, coords, lines, color, circle_creator
+    global circles, moves, slider, square_creator, squares
     
     #checks if pen mode is on
     if pen_draw.draw_mode:
         circle_creator = False
         line_creator   = False
+        square_creator = False
         return False
     
     #removes the size slider if its on
-    if (line_creator or circle_creator) and slider != None:
+    if (line_creator or circle_creator or square_creator) and slider != None:
         canvas.delete(slider)
         slider = None
     
@@ -196,6 +229,22 @@ def clicked(event):
         for shape in circles:
             canvas.delete(shape)
         circles = []
+    
+    if square_creator and len(coords) == 0:
+        coords.append(event.x)
+        coords.append(event.y)
+    
+    elif square_creator and len(coords) != 0:
+        if color != "":
+            square = canvas.create_rectangle(coords, event.x, event.y, fill=color)
+        else:
+            square = canvas.create_rectangle(coords, event.x, event.y)
+        moves.append(square)
+        coords = []
+        
+        for shape in squares:
+            canvas.delete(shape)
+        squares = []
 
 def draw_shape(event):
     """Draws either the circle or line depending on which mode is active
@@ -203,7 +252,8 @@ def draw_shape(event):
     :param event: the place where the mouse is
     :return: None"""
 
-    global line_creator, coords, lines, canvas, color, circle_creator, circles, pen_size_slider
+    global line_creator, coords, lines, canvas, color, circle_creator, circles
+    global pen_size_slider, square_creator, squares
     
     #creates a line if line mode is active
     if line_creator:
@@ -236,6 +286,22 @@ def draw_shape(event):
             else:
                 circle = canvas.create_oval(coords, event.x, event.y)
             circles.append(circle)
+    
+    #creates a square if square mode is active
+    elif square_creator:
+        if len(coords) != 0:
+            try:
+                for square in squares:
+                    canvas.delete(square)
+                    squares.remove(square)
+            except IndexError:
+                pass
+            
+            if color != "":
+                square = canvas.create_rectangle(coords, event.x, event.y, fill=color)
+            else:
+                square = canvas.create_rectangle(coords, event.x, event.y)
+            squares.append(square)
             
 def set_background():
     """Sets the background color based on the user's choice"""
@@ -260,7 +326,11 @@ def undo():
     #tries to remove the most recent move
     try:
         move = moves[-1]
-        canvas.delete(move)
+        if type(move) is list:
+            for i in move:
+                canvas.delete(i)
+        else:
+            canvas.delete(move)
         moves.remove(move)
         
         undo_list.append(move)
@@ -270,25 +340,43 @@ def undo():
     pen_draw.moves = moves
 
 def redo():
-    """Re-does the most recent move that was un-done by the user"""
+    """Re-does the most recent move that was un-done"""
     global moves, undo_list
     
+    #tries to redo the most recent un-done move
     try:
         move = undo_list[-1]
-        #DNF
+        if type(move) is list:
+            for i in move:
+                canvas.delete(i)
+        else:
+            canvas.delete(move)
+        undo_list.remove(move)
     except IndexError:
         pass
+    
+    pen_draw.moves = moves
 
 def main():
     """Starts the whole program and listens for mouse clicks"""
     global pen_draw
     
     create_buttons()
-    pen_draw = painter.Draw_tools(bg, canvas, color, circle_creator, erased,
-                line_creator, moves, root, sizer, pen_size_slider, slider)
+    pen_draw = painter.Draw_tools(bg, canvas, color, circle_creator, erased, line_creator,
+                                  moves, root, sizer, square_creator, pen_size_slider, slider)
+    
+    menubar = tk.Menu(root)
+    file_menu = tk.Menu(menubar, tearoff=0)
+    
+    file_menu.add_command(label="Undo", command=undo)
+    file_menu.add_command(label="Save", command=pen_draw.save)
+    menubar.add_cascade(label="Edit", menu=file_menu)
+    root.config(menu=menubar)
+    
     
     canvas.bind("<Button-1>", clicked)
     canvas.bind("<Motion>", draw_shape)
+    root.bind("<Command-u>", lambda x: undo())
     root.mainloop()
 
 if __name__ == '__main__':
