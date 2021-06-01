@@ -9,8 +9,9 @@ from PIL import Image, ImageGrab
 class Draw_tools(object):
     pen_size = 1.0
 
-    def __init__(self, bg, canvas, color, circle_creator, erased, line_creator,
-                 moves, root, sizer, square_creator, pen_size_slider, slider):
+    def __init__(self, bg, canvas, color, circle_creator, erased, height, line_creator,
+                 moves, root, sizer, square_creator, pen_size_slider, slider, width,
+                 x_shift, y_shift):
         """Sets up all the drawing tools
 
         :param bg: the current background
@@ -39,10 +40,14 @@ class Draw_tools(object):
         self.color          = color
         self.circle_creator = circle_creator
         self.erased         = erased
+        self.height         = height - 60
         self.line_creator   = line_creator
         self.moves          = moves
         self.slider         = slider
         self.square_creator = square_creator
+        self.width          = width - 35
+        self.x_shift        = x_shift
+        self.y_shift        = y_shift
         
         self.sizer           = sizer
         self.pen_size_slider = pen_size_slider
@@ -130,10 +135,11 @@ class Draw_tools(object):
         y_dist = 30
         
         #gets the size of the window
-        self.x1 = self.root.winfo_x() + self.canvas.winfo_x() + x_dist
-        self.y1 = self.root.winfo_y() + self.canvas.winfo_y() + y_dist
-        self.x2 = self.x1 + self.canvas.winfo_width() - x_dist * 2
-        self.y2 = self.y1 + self.canvas.winfo_height() - y_dist -(x_dist * 2)
+        self.x1 = self.x_shift
+        self.y1 = self.y_shift
+        self.x2 = self.width
+        self.y2 = self.height
+        print(self.width, self.x2, self.height, self.y2)
         
         #checks if a file might be overwritten
         try:
@@ -151,6 +157,9 @@ class Draw_tools(object):
         
         except FileNotFoundError:
             self.continue_saving()
+        
+        except:
+            self.continue_saving()
 
     def continue_saving(self):
         """Continues saving the file"""
@@ -159,6 +168,7 @@ class Draw_tools(object):
             self.master.destroy()
             
         #takes a screenshot, crops the window, and saves
+        print(self.x1, self.y1, self.x2, self.y2)
         ImageGrab.grab().crop((self.x1, self.y1, self.x2, self.y2)).save(self.file_name
                                                                          + self.file_type)
     
