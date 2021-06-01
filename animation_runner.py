@@ -6,6 +6,10 @@ __version__ = 3.3
 import tkinter as tk
 import painter
 from tkinter import colorchooser
+import platform
+
+if platform.system() == "Darwin":
+    system = "mac"
 
 height  = 500
 width   = 900
@@ -359,11 +363,12 @@ def redo():
 
 def main():
     """Starts the whole program and listens for mouse clicks"""
-    global pen_draw
+    global pen_draw, height, width, x_shift, y_shift
     
     create_buttons()
-    pen_draw = painter.Draw_tools(bg, canvas, color, circle_creator, erased, line_creator,
-                                  moves, root, sizer, square_creator, pen_size_slider, slider)
+    pen_draw = painter.Draw_tools(bg, canvas, color, circle_creator, erased, height,
+                                  line_creator, moves, root, sizer, square_creator,
+                                  pen_size_slider, slider, width, x_shift, y_shift)
     
     menubar = tk.Menu(root)
     file_menu = tk.Menu(menubar, tearoff=0)
@@ -376,7 +381,11 @@ def main():
     
     canvas.bind("<Button-1>", clicked)
     canvas.bind("<Motion>", draw_shape)
-    root.bind("<Control-u>", lambda x: undo())
+    if system == "mac":
+        root.bind("<Command-z>", lambda x: undo())
+    else:
+        root.bind("<Control-z>", lambda x: undo())
+    
     root.mainloop()
 
 if __name__ == '__main__':
