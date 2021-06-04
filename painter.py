@@ -1,7 +1,7 @@
 #!/usr/bin/python
 #painter.py
 __author__ = "Elijah"
-__version__ = 2.0
+__version__ = 2.3
 
 import tkinter as tk
 from PIL import Image, ImageGrab
@@ -19,17 +19,24 @@ class Draw_tools(object):
         :param color: the current brush color
         :param circle_creator: whether or not circle mode is on
         :param erased: the list of erased lines
+        :param height: the height of the window
         :param line_creator: whether or not line mode is on
         :param moves: the list of total moves
         :param root: the tkinter window
         :param sizer: whether or not the pen size slider is open
+        :param square_creator: whether or not square mode is on
         :param pen_size_slider: the slider for the size of the pen
         :param slider: the circle that shows the current brush size
+        :param width: the width of the window
+        :param x_shift: the amount the window is shifted horizontally
+        :param y_shift: the amount the window is shifted vertically
         :return: None"""
         
         self.root = root
-        self.pen_button    = tk.Button(self.root, text="pen", command=self.set_pen_mode)
-        self.eraser_button = tk.Button(self.root, text="eraser", command=self.set_eraser_mode)
+        self.pen_img    = tk.PhotoImage(file="Tkinter_Images/pencil.gif")
+        self.eraser_img = tk.PhotoImage(file="Tkinter_Images/eraser.gif")
+        self.pen_button    = tk.Button(self.root, image=self.pen_img, command=self.set_pen_mode)
+        self.eraser_button = tk.Button(self.root, image=self.eraser_img, command=self.set_eraser_mode)
         self.save_button   = tk.Button(self.root, text="save", command=self.save)
         self.submit_btn    = tk.Button(self.root, text="submit", command=self.submit)
         
@@ -53,9 +60,9 @@ class Draw_tools(object):
         self.pen_size_slider = pen_size_slider
         self.canvas          = canvas
 
-        self.pen_button.grid(row=0, column=7)
-        self.eraser_button.grid(row=0, column=8)
-        self.save_button.grid(row=0, column=9)
+        self.pen_button.grid(row=0, column=9)
+        self.eraser_button.grid(row=0, column=10)
+        self.save_button.grid(row=0, column=11)
         
         self.file_name = ""
         self.file_type = ""
@@ -86,20 +93,21 @@ class Draw_tools(object):
         
         self.activate_button(self.pen_button)
         self.draw_mode = True
-        self.canvas.config(cursor="pencil")
+        self.canvas.config(cursor="@Tkinter_Images/pencil.cur")
 
     def set_eraser_mode(self):
         """Turns on eraser mode"""
         
         self.draw_mode = True
         self.activate_button(self.eraser_button, eraser_mode=True)
+        self.canvas.config(cursor="@Tkinter_Images/eraser.cur")
 
     def save(self):
         """Saves the file with the user's choice of file name"""
         
-        self.entry.grid(row=1, column=9, rowspan=1, columnspan=1)
-        self.box.grid(row=1, column=10, rowspan=1, columnspan=1)
-        self.submit_btn.grid(row=0, column=9, rowspan=1, columnspan=1)
+        self.entry.grid(row=1, column=11, rowspan=1, columnspan=1)
+        self.box.grid(row=1, column=12, rowspan=1, columnspan=1)
+        self.submit_btn.grid(row=0, column=11, rowspan=1, columnspan=1)
         
         self.box.insert(0, 'GIF')
         self.box.insert(1, 'PNG')
@@ -137,15 +145,15 @@ class Draw_tools(object):
         #gets the size of the window
         self.x1 = self.x_shift
         self.y1 = self.y_shift
-        self.x2 = self.width
-        self.y2 = self.height
-        print(self.width, self.x2, self.height, self.y2)
+        self.x2 = 2000
+        self.y2 = 1500
         
         #checks if a file might be overwritten
         try:
             img = Image.open(self.file_name + file_type)
             
             self.master = tk.Tk()
+            self.master.title("")
             label = tk.Label(self.master, text="WARNING!\nYou already have a "+\
                                "file with this name. Do you want to overwrite it?")
             yes_button = tk.Button(self.master, text="Yes", command=self.continue_saving)
@@ -168,7 +176,6 @@ class Draw_tools(object):
             self.master.destroy()
             
         #takes a screenshot, crops the window, and saves
-        print(self.x1, self.y1, self.x2, self.y2)
         ImageGrab.grab().crop((self.x1, self.y1, self.x2, self.y2)).save(self.file_name
                                                                          + self.file_type)
     
@@ -212,7 +219,6 @@ class Draw_tools(object):
         if (self.circle_creator or self.line_creator or self.square_creator) and not self.draw_mode:
             return False
         
-        self.canvas.config(cursor="pencil")
         
         #sets the color of the brush
         if self.color != "":
@@ -224,13 +230,14 @@ class Draw_tools(object):
         
         #activates eraser if eraser mode is on
         if self.eraser_on:
-            self.canvas.config(cursor="")
+            self.canvas.config(cursor="@Tkinter_Images/eraser.cur")
             if self.bg != "":
                 paint_color = self.bg
             else:
                 paint_color = "white"
         else:
             paint_color = self.color
+            self.canvas.config(cursor="@Tkinter_Images/pencil.cur")
         
         #connects the line to the mouse
         if self.old_x and self.old_y:
