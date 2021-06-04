@@ -1,13 +1,14 @@
 #!/usr/bin/python
 #animation_runner.py
 __author__ = "Elijah"
-__version__ = 3.3
+__version__ = 3.5
 
 import tkinter as tk
 import painter
 from tkinter import colorchooser
 import platform
 
+system = ""
 if platform.system() == "Darwin":
     system = "mac"
 
@@ -16,7 +17,8 @@ width   = 900
 x_shift = 0
 y_shift = 20
 
-slider   = None
+slider = None
+master = None
 
 bg = "white"
 
@@ -25,13 +27,13 @@ line_creator   = False
 square_creator = False
 sizer          = False
 
-coords    = []
-circles   = []
-erased    = []
-lines     = []
-moves     = []
-squares   = []
-undo_list = []
+coords     = []
+circles    = []
+erased     = []
+lines      = []
+moves      = []
+squares    = []
+undo_list  = []
 
 root = tk.Tk()
 root.title("Animation")
@@ -79,11 +81,13 @@ pen_draw = ""
 def create_buttons():
     """Creates the buttons for the main screen"""
     undo_btn       = tk.Button(root, text="Undo", command=undo)
+    redo_btn       = tk.Button(root, text="Redo", command=redo)
     line_btn       = tk.Button(root, text="Line", command=set_line_mode)
     circle_btn     = tk.Button(root, text="Circle", command=set_circle_mode)
     background_btn = tk.Button(root, text="Background", command=set_background)
     size_btn       = tk.Button(root, text="Size", command=set_pen_size)
     square_btn     = tk.Button(root, text="Square", command=set_square_mode)
+    clear_btn      = tk.Button(root, text="Clear", command=check)
 
     line_btn.grid(row=0, column=0)
     circle_btn.grid(row=0, column=1)
@@ -92,6 +96,8 @@ def create_buttons():
     background_btn.grid(row=0, column=4)
     size_btn.grid(row=0, column=5)
     undo_btn.grid(row=0, column=6)
+    redo_btn.grid(row=0, column=7)
+    clear_btn.grid(row=0, column=8)
 
 def set_circle_mode():
     """Turns on circle mode if the circle button is clicked"""
@@ -268,11 +274,14 @@ def draw_shape(event):
                     lines.remove(line)
             except IndexError:
                 pass
+            
+            size = pen_size_slider.get()
 
             if color != "":
-                line = canvas.create_line(coords, event.x, event.y, fill=color)
+                line = canvas.create_line(coords, event.x, event.y,
+                                          width=size, fill=color)
             else:
-                line = canvas.create_line(coords, event.x, event.y)
+                line = canvas.create_line(coords, event.x, event.y, width=size)
             lines.append(line)
     
     #creates a circle is circle mode is active
@@ -327,14 +336,17 @@ def undo():
     """Un-does the most recent move made by the user"""
     global moves, undo_list
     
+    coords_list = []
     #tries to remove the most recent move
     try:
         move = moves[-1]
+        num = 10000
         if type(move) is list:
             for i in move:
-                canvas.delete(i)
+                canvas.move(i, num, num)
         else:
-            canvas.delete(move)
+            canvas.move(move, num, num)
+        
         moves.remove(move)
         
         undo_list.append(move)
@@ -350,32 +362,121 @@ def redo():
     #tries to redo the most recent un-done move
     try:
         move = undo_list[-1]
+        num = -10000
+        
         if type(move) is list:
             for i in move:
-                canvas.delete(i)
+                canvas.move(i, num, num)   
         else:
-            canvas.delete(move)
+            canvas.move(move, num, num)
+            
         undo_list.remove(move)
+        moves.append(move)
+        
     except IndexError:
         pass
     
     pen_draw.moves = moves
 
+class Fullscreen:
+    def __init__(self, root, height, width, x_shift, y_shift):
+        """Enables fullscreen if the user toggles fullscreen
+        
+        :param root: the tkinter window
+        :param height: the height of the window
+        :param width: the width of the window
+        :param x_shift: the amount the window is shifted horizontally
+        :param y_shift: the amount the window is shifted vertically
+        :return: None"""
+        
+        self.root    = root
+        self.height  = height
+        self.width   = width
+        self.x_shift = x_shift
+        self.y_shift = y_shift
+        
+        self.state = False
+
+    def toggle_fullscreen(self, event=None):
+        """Toggles fullscreen mode
+        
+        :param event: the key that was pressed
+        :return: None"""
+        
+        self.state = not self.state
+        self.root.attributes("-fullscreen", self.state)
+        
+        #sets the window to its original size if it exits fullscreen
+        if not self.state:
+            self.root.geometry("%dx%d+%d+%d" % (self.width, self.height,
+                                                self.x_shift, self.y_shift))
+
+    def end_fullscreen(self, event=None):
+        """Ends the fullscreen mode
+        
+        :param event: the key that was pressed
+        :return: None"""
+        
+        self.state = False
+        self.root.attributes("-fullscreen", False)
+        
+        #sets the window back to its original size
+        self.root.geometry("%dx%d+%d+%d" % (self.width, self.height,
+                                            self.x_shift, self.y_shift))
+
+def check():
+    """Checks with the user to see if they really want to clear the canvas"""
+    
+    global master
+    master = tk.Tk()
+    master.title("")
+    label = tk.Label(master, text="Are you sure you wish to clear the board?")
+    yes_btn = tk.Button(master, text="Yes", command=clear)
+    no_btn  = tk.Button(master, text="No", command=stop)
+    
+    label.pack()
+    yes_btn.pack()
+    no_btn.pack()
+
+def clear():
+    """Clears the canvas"""
+    
+    global canvas
+    stop()
+    
+    canvas.delete("all")
+    
+
+def stop():
+    """Deletes the extra window"""
+    
+    global master
+    master.destroy()
+    master = None
+    
 def main():
     """Starts the whole program and listens for mouse clicks"""
     global pen_draw, height, width, x_shift, y_shift
     
     create_buttons()
+    window   = Fullscreen(root, height, width, x_shift, y_shift)
     pen_draw = painter.Draw_tools(bg, canvas, color, circle_creator, erased, height,
                                   line_creator, moves, root, sizer, square_creator,
                                   pen_size_slider, slider, width, x_shift, y_shift)
     
     menubar = tk.Menu(root)
     file_menu = tk.Menu(menubar, tearoff=0)
+    edit_menu = tk.Menu(menubar, tearoff=0)
+    view_menu = tk.Menu(menubar, tearoff=0)
     
-    file_menu.add_command(label="Undo", command=undo)
+    edit_menu.add_command(label="Undo", command=undo)
+    edit_menu.add_command(label="Redo", command=redo)
     file_menu.add_command(label="Save", command=pen_draw.save)
-    menubar.add_cascade(label="Edit", menu=file_menu)
+    view_menu.add_command(label="Fullscreen", command=window.toggle_fullscreen)
+    
+    menubar.add_cascade(label="File", menu=file_menu)
+    menubar.add_cascade(label="Edit", menu=edit_menu)
+    menubar.add_cascade(label="View", menu=view_menu)
     root.config(menu=menubar)
     
     
@@ -383,8 +484,13 @@ def main():
     canvas.bind("<Motion>", draw_shape)
     if system == "mac":
         root.bind("<Command-z>", lambda x: undo())
+        root.bind("<Command-y>", lambda x: redo())
+        root.bind("<Command-Shift-f>", window.toggle_fullscreen)
     else:
         root.bind("<Control-z>", lambda x: undo())
+        root.bind("<Control-y>", lambda x: redo())
+        root.bind("<Control-Shift-f>", window.toggle_fullscreen)
+    root.bind("<Escape>", window.end_fullscreen)
     
     root.mainloop()
 
