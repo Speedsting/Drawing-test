@@ -1,17 +1,18 @@
 #!/usr/bin/python
 #painter.py
 __author__ = "Elijah"
-__version__ = 2.3
+__version__ = 2.4
 
 import tkinter as tk
 from PIL import Image, ImageGrab
+import math
 
 class Draw_tools(object):
     pen_size = 1.0
 
-    def __init__(self, bg, canvas, color, circle_creator, erased, height, line_creator,
-                 moves, root, sizer, square_creator, pen_size_slider, slider, width,
-                 x_shift, y_shift):
+    def __init__(self, bg, canvas, color, circle_creator, erased, fill_mode,
+                 height, line_creator, moves, root, square_creator,
+                 pen_size_slider, slider, width, x_shift, y_shift):
         """Sets up all the drawing tools
 
         :param bg: the current background
@@ -19,11 +20,11 @@ class Draw_tools(object):
         :param color: the current brush color
         :param circle_creator: whether or not circle mode is on
         :param erased: the list of erased lines
+        :param fill_mode: whether or not fill mode is on
         :param height: the height of the window
         :param line_creator: whether or not line mode is on
         :param moves: the list of total moves
         :param root: the tkinter window
-        :param sizer: whether or not the pen size slider is open
         :param square_creator: whether or not square mode is on
         :param pen_size_slider: the slider for the size of the pen
         :param slider: the circle that shows the current brush size
@@ -35,7 +36,10 @@ class Draw_tools(object):
         self.root = root
         self.pen_img    = tk.PhotoImage(file="Tkinter_Images/pencil.gif")
         self.eraser_img = tk.PhotoImage(file="Tkinter_Images/eraser.gif")
+        self.brush_img  = tk.PhotoImage(file="Tkinter_Images/brush.gif")
+        
         self.pen_button    = tk.Button(self.root, image=self.pen_img, command=self.set_pen_mode)
+        self.brush_button  = tk.Button(self.root, image=self.brush_img, command=self.set_brush_mode)
         self.eraser_button = tk.Button(self.root, image=self.eraser_img, command=self.set_eraser_mode)
         self.save_button   = tk.Button(self.root, text="save", command=self.save)
         self.submit_btn    = tk.Button(self.root, text="submit", command=self.submit)
@@ -47,6 +51,7 @@ class Draw_tools(object):
         self.color          = color
         self.circle_creator = circle_creator
         self.erased         = erased
+        self.fill_mode      = fill_mode
         self.height         = height - 60
         self.line_creator   = line_creator
         self.moves          = moves
@@ -56,13 +61,13 @@ class Draw_tools(object):
         self.x_shift        = x_shift
         self.y_shift        = y_shift
         
-        self.sizer           = sizer
         self.pen_size_slider = pen_size_slider
         self.canvas          = canvas
-
-        self.pen_button.grid(row=0, column=9)
-        self.eraser_button.grid(row=0, column=10)
-        self.save_button.grid(row=0, column=11)
+        
+        self.save_button.grid(row=10, column=0)
+        self.pen_button.grid(row=11, column=0)
+        self.brush_button.grid(row=12, column=0)
+        self.eraser_button.grid(row=13, column=0)
         
         self.file_name = ""
         self.file_type = ""
@@ -70,6 +75,7 @@ class Draw_tools(object):
         self.moving = []
         
         self.draw_mode  = False
+        self.brush_mode = False
         self.master     = None
         
         self.setup()
@@ -79,7 +85,7 @@ class Draw_tools(object):
         
         self.old_x = None
         self.old_y = None
-        self.line_width = self.pen_size_slider.get()
+        self.line_width = self.pen_size
         self.eraser_on = False
         self.active_button = self.pen_button
         
@@ -92,22 +98,32 @@ class Draw_tools(object):
         """Turns on pen mode and sets the cursor to a pencil"""
         
         self.activate_button(self.pen_button)
-        self.draw_mode = True
+        self.draw_mode  = True
+        self.brush_mode = False
         self.canvas.config(cursor="@Tkinter_Images/pencil.cur")
+    
+    def set_brush_mode(self):
+        """Turns on brush mode and sets cursor to a brush"""
+        
+        self.activate_button(self.brush_button)
+        self.canvas.config(cursor="@Tkinter_Images/brush.cur")
+        self.draw_mode  = True
+        self.brush_mode = True
 
     def set_eraser_mode(self):
         """Turns on eraser mode"""
         
-        self.draw_mode = True
+        self.draw_mode  = True
+        self.brush_mode = False
         self.activate_button(self.eraser_button, eraser_mode=True)
         self.canvas.config(cursor="@Tkinter_Images/eraser.cur")
 
     def save(self):
         """Saves the file with the user's choice of file name"""
         
-        self.entry.grid(row=1, column=11, rowspan=1, columnspan=1)
-        self.box.grid(row=1, column=12, rowspan=1, columnspan=1)
-        self.submit_btn.grid(row=0, column=11, rowspan=1, columnspan=1)
+        self.entry.grid(row=10, column=2, rowspan=1, columnspan=1)
+        self.box.grid(row=11, column=2, rowspan=1, columnspan=1)
+        self.submit_btn.grid(row=10, column=1, rowspan=1, columnspan=1)
         
         self.box.insert(0, 'GIF')
         self.box.insert(1, 'PNG')
@@ -176,8 +192,10 @@ class Draw_tools(object):
             self.master.destroy()
             
         #takes a screenshot, crops the window, and saves
-        ImageGrab.grab().crop((self.x1, self.y1, self.x2, self.y2)).save(self.file_name
-                                                                         + self.file_type)
+        self.canvas.postscript(file=self.file_name + '.eps')
+        
+        #.grab().crop((self.x1, self.y1, self.x2, self.y2)).save(self.file_name
+                                                                         #+ self.file_type)
     
     def stop_saving(self):
         """Stops saving the file"""
@@ -208,15 +226,8 @@ class Draw_tools(object):
         :param event: the last place where the mouse was
         :return: False if circle mode or line mode is active"""
         
-        #removes the slider from the window
-        if self.sizer:
-            self.pen_size_slider.grid_forget()
-            self.canvas.delete(self.slider)
-            
-            self.slider = None
-            self.sizer  = False
-        
-        if (self.circle_creator or self.line_creator or self.square_creator) and not self.draw_mode:
+        if (self.circle_creator or self.line_creator or self.square_creator
+            or self.fill_mode) and not self.draw_mode:
             return False
         
         
@@ -225,8 +236,11 @@ class Draw_tools(object):
             self.color = self.color
         else:
             self.color = "black"
-            
-        self.line_width = self.pen_size_slider.get()
+        
+        try:
+            self.line_width = self.pen_size_slider.get()
+        except AttributeError:
+            pass
         
         #activates eraser if eraser mode is on
         if self.eraser_on:
@@ -237,14 +251,33 @@ class Draw_tools(object):
                 paint_color = "white"
         else:
             paint_color = self.color
-            self.canvas.config(cursor="@Tkinter_Images/pencil.cur")
+            if self.brush_mode:
+                self.canvas.config(cursor="@Tkinter_Images/brush.cur")
+            else:
+                self.canvas.config(cursor="@Tkinter_Images/pencil.cur")
+        
         
         #connects the line to the mouse
         if self.old_x and self.old_y:
-            line = self.canvas.create_line(self.old_x, self.old_y, event.x,
-                                           event.y, width=self.line_width,
-                                           fill=paint_color, capstyle='round',
-                                           smooth='true', splinesteps=36)
+            if self.brush_mode:
+                x = abs((event.x ** 2) - (self.old_x ** 2))
+                y = abs((event.y ** 2) - (self.old_y ** 2))
+                x = round(math.sqrt(x), 3)
+                y = round(math.sqrt(y), 3)
+                dist = (x + y) // 2
+                width = abs(dist - self.line_width) % self.line_width
+                
+                
+                line = self.canvas.create_line(self.old_x, self.old_y, event.x,
+                                               event.y, width=width,
+                                               fill=paint_color, capstyle='round',
+                                               smooth='true', joinstyle='miter',
+                                               dash=(2, 1,))
+            else:
+                line = self.canvas.create_line(self.old_x, self.old_y, event.x,
+                                               event.y, width=self.line_width,
+                                               fill=paint_color, capstyle='round',
+                                               smooth='true', splinesteps=36)
             if self.eraser_on:
                 self.erased.append(line)
             self.moving.append(line)
